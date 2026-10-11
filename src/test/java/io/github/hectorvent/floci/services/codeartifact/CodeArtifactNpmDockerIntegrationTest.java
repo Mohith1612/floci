@@ -98,10 +98,17 @@ class CodeArtifactNpmDockerIntegrationTest {
     @Test
     @Order(1)
     void publishThenFetchRoundTripsTheRealNpmEnvelope() throws IOException {
+        long assetSizeBytesBeforePublish = describeDomainAssetSizeBytes();
+
         given().header("Authorization", "Bearer " + bearerToken).contentType("application/json")
                 .body(publishFixture)
                 .put("/codeartifact/npm/" + DOMAIN + "/" + REPO + "/" + PACKAGE_NAME)
                 .then().statusCode(anyOf201Or200());
+
+        // assetSizeBytes used to be hardcoded to 0 regardless of what was actually published; this
+        // is the real Verdaccio round trip proving a real npm publish now counts, by exactly the
+        // tarball's own decoded byte count (not the envelope's base64-and-JSON-wrapped size).
+        assertEquals(assetSizeBytesBeforePublish + expectedTarballBytes.length, describeDomainAssetSizeBytes());
 
         String metadataBody = given().header("Authorization", "Bearer " + bearerToken)
                 .get("/codeartifact/npm/" + DOMAIN + "/" + REPO + "/" + PACKAGE_NAME)
@@ -139,10 +146,23 @@ class CodeArtifactNpmDockerIntegrationTest {
     @Test
     @Order(2)
     void republishingTheSameEnvelopeASecondTimeIsStillIdempotent() {
+        long assetSizeBytesBeforeRepublish = describeDomainAssetSizeBytes();
+
         given().header("Authorization", "Bearer " + bearerToken).contentType("application/json")
                 .body(publishFixture)
                 .put("/codeartifact/npm/" + DOMAIN + "/" + REPO + "/" + PACKAGE_NAME)
                 .then().statusCode(anyOf201Or200());
+
+        // The confirmed-republish short-circuit never reaches Verdaccio, so no new bytes were
+        // written; assetSizeBytes must not count this tarball a second time.
+        assertEquals(assetSizeBytesBeforeRepublish, describeDomainAssetSizeBytes());
+    }
+
+    private static long describeDomainAssetSizeBytes() {
+        return given().header("Authorization", AUTH)
+                .get("/v1/domain?domain=" + DOMAIN)
+                .then().statusCode(200)
+                .extract().jsonPath().getLong("domain.assetSizeBytes");
     }
 
     @Test

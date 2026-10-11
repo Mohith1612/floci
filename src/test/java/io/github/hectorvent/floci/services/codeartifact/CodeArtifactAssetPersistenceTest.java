@@ -468,6 +468,8 @@ class CodeArtifactAssetPersistenceTest {
                 "codeartifact-package-versions.json", new TypeReference<Map<String, CodeArtifactPackageVersion>>() {});
         AccountAwareStorageBackend<PackageOriginConfig> packageOriginConfigStore = accountAware(dir,
                 "codeartifact-package-origin-configs.json", new TypeReference<Map<String, PackageOriginConfig>>() {});
+        AccountAwareStorageBackend<Long> containerBackedAssetBytesStore = accountAware(dir,
+                "codeartifact-container-backed-asset-bytes.json", new TypeReference<Map<String, Long>>() {});
 
         RegionResolver regionResolver = mock(RegionResolver.class);
         when(regionResolver.getAccountId()).thenReturn(ACCOUNT_ID);
@@ -479,7 +481,7 @@ class CodeArtifactAssetPersistenceTest {
         when(config.effectiveBaseUrl()).thenReturn("http://localhost:4566");
 
         return new CodeArtifactService(domainStore, repoStore, packageVersionStore, packageOriginConfigStore,
-                regionResolver, config, false, dir.resolve("codeartifact-assets"),
+                containerBackedAssetBytesStore, regionResolver, config, false, dir.resolve("codeartifact-assets"),
                 new CodeArtifactSidecarRegistry(List.of()));
     }
 
