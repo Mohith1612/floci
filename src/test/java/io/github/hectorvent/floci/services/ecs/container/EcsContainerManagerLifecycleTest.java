@@ -1,7 +1,10 @@
 package io.github.hectorvent.floci.services.ecs.container;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.InspectVolumeResponse;
 import com.github.dockerjava.api.command.ListContainersCmd;
+import com.github.dockerjava.api.command.ListVolumesCmd;
+import com.github.dockerjava.api.command.ListVolumesResponse;
 import com.github.dockerjava.api.command.RemoveContainerCmd;
 import com.github.dockerjava.api.command.StopContainerCmd;
 import com.github.dockerjava.api.model.Container;
@@ -259,10 +262,76 @@ class EcsContainerManagerLifecycleTest {
         verify(lifecycleManager, never()).removeIfExistsStrict(anyString());
     }
 
+    @Test
+    void previousRunVolumesAreRemovedAfterContainersAndFailedRemovalIsRetried() {
+        ContainerLifecycleManager lifecycle = mock(ContainerLifecycleManager.class);
+        stubLeftoverListing(lifecycle, Map.of(), Map.of());
+        InspectVolumeResponse old = leftoverVolume("old", "alpha/4566", "previous");
+        InspectVolumeResponse current = leftoverVolume("current", "alpha/4566", "current");
+        InspectVolumeResponse foreign = leftoverVolume("foreign", "beta/4566", "previous");
+        InspectVolumeResponse unowned = leftoverVolume("unowned", "alpha/4566", null);
+        InspectVolumeResponse conflicting = leftoverVolume("conflicting", "alpha/4566", "previous");
+        when(conflicting.getLabels()).thenReturn(Map.of("io.floci.service", "ecs",
+                "io.floci.owner", "alpha/4566", "floci_owner_port", "beta/4566", "io.floci.ecs.run", "previous"));
+        stubVolumeListing(lifecycle.getDockerClient(), List.of(old, current, foreign, unowned, conflicting));
+        when(lifecycle.removeVolume("old")).thenReturn(false, true);
+        EcsContainerManager manager = manager(lifecycle, namespacedConfig());
+
+        assertFalse(manager.removeLeftoverContainers("current"));
+        assertTrue(manager.removeLeftoverContainers("current"));
+        verify(lifecycle, times(2)).removeVolume("old");
+        verify(lifecycle, never()).removeVolume("current");
+        verify(lifecycle, never()).removeVolume("foreign");
+        verify(lifecycle, never()).removeVolume("unowned");
+        verify(lifecycle, never()).removeVolume("conflicting");
+    }
+
+    @Test
+    void previousRunVolumeSweepWaitsForContainerRemoval() {
+        ContainerLifecycleManager lifecycle = mock(ContainerLifecycleManager.class);
+        stubLeftoverListing(lifecycle, Map.of("old-container", leftover("old-container",
+                Map.of("io.floci.service", "ecs", "io.floci.owner", "alpha/4566", "io.floci.ecs.run", "previous"))),
+                Map.of());
+        doThrow(new IllegalStateException("busy")).when(lifecycle).removeIfExistsStrict("old-container");
+        assertFalse(manager(lifecycle, namespacedConfig()).removeLeftoverContainers("current"));
+        verify(lifecycle.getDockerClient(), never()).listVolumesCmd();
+    }
+
+    @Test
+    void previousRunVolumeSweepRetriesWhenInventoryCannotBeRead() {
+        ContainerLifecycleManager lifecycle = mock(ContainerLifecycleManager.class);
+        stubLeftoverListing(lifecycle, Map.of(), Map.of());
+        when(lifecycle.getDockerClient().listVolumesCmd()).thenThrow(new IllegalStateException("offline"));
+        assertFalse(manager(lifecycle, namespacedConfig()).removeLeftoverContainers("current"));
+        verify(lifecycle, never()).removeVolume(anyString());
+    }
+
+    private static InspectVolumeResponse leftoverVolume(String name, String owner, String run) {
+        InspectVolumeResponse volume = mock(InspectVolumeResponse.class);
+        when(volume.getName()).thenReturn(name);
+        Map<String, String> labels = new LinkedHashMap<>();
+        labels.put("io.floci.service", "ecs");
+        labels.put("io.floci.owner", owner);
+        if (run != null) {
+            labels.put("io.floci.ecs.run", run);
+        }
+        when(volume.getLabels()).thenReturn(labels);
+        return volume;
+    }
+
+    private static void stubVolumeListing(DockerClient docker, List<InspectVolumeResponse> volumes) {
+        ListVolumesCmd command = mock(ListVolumesCmd.class, RETURNS_SELF);
+        ListVolumesResponse response = mock(ListVolumesResponse.class);
+        when(docker.listVolumesCmd()).thenReturn(command);
+        when(command.exec()).thenReturn(response);
+        when(response.getVolumes()).thenReturn(volumes);
+    }
+
     private static void stubLeftoverListing(ContainerLifecycleManager lifecycleManager,
                                             Map<String, Container> newKeys, Map<String, Container> legacyKeys) {
         DockerClient dockerClient = mock(DockerClient.class);
         when(lifecycleManager.getDockerClient()).thenReturn(dockerClient);
+        stubVolumeListing(dockerClient, List.of());
         ListContainersCmd listCmd = mock(ListContainersCmd.class, RETURNS_SELF);
         when(dockerClient.listContainersCmd()).thenReturn(listCmd);
         ListContainersCmd byNewKeys = mock(ListContainersCmd.class);
