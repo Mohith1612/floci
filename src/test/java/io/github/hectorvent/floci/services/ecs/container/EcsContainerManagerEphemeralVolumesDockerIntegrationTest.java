@@ -102,7 +102,10 @@ class EcsContainerManagerEphemeralVolumesDockerIntegrationTest {
         assertEquals("ecs-ephemeral-volumes-test/4566", labels.get(ContainerStorageHelper.OWNER_LABEL));
         assertTrue(labels.containsKey(EcsContainerManager.RUN_LABEL));
         try {
-            assertTrue(manager.removeLeftoverContainers("next-run-" + UUID.randomUUID()));
+            String nextRun = "next-run-" + UUID.randomUUID();
+            assertTrue(manager.removeLeftoverContainers(nextRun));
+            dockerClient.inspectVolumeCmd(volumeName).exec();
+            assertTrue(manager.removeLeftoverTaskVolumes(nextRun));
             assertThrows(NotFoundException.class, () -> dockerClient.inspectVolumeCmd(volumeName).exec());
             for (String containerId : task.getContainerIds().values()) {
                 assertThrows(NotFoundException.class, () -> dockerClient.inspectContainerCmd(containerId).exec());

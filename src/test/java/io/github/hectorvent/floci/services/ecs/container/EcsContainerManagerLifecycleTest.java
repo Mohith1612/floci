@@ -277,8 +277,9 @@ class EcsContainerManagerLifecycleTest {
         when(lifecycle.removeVolume("old")).thenReturn(false, true);
         EcsContainerManager manager = manager(lifecycle, namespacedConfig());
 
-        assertFalse(manager.removeLeftoverContainers("current"));
         assertTrue(manager.removeLeftoverContainers("current"));
+        assertFalse(manager.removeLeftoverTaskVolumes("current"));
+        assertTrue(manager.removeLeftoverTaskVolumes("current"));
         verify(lifecycle, times(2)).removeVolume("old");
         verify(lifecycle, never()).removeVolume("current");
         verify(lifecycle, never()).removeVolume("foreign");
@@ -302,7 +303,9 @@ class EcsContainerManagerLifecycleTest {
         ContainerLifecycleManager lifecycle = mock(ContainerLifecycleManager.class);
         stubLeftoverListing(lifecycle, Map.of(), Map.of());
         when(lifecycle.getDockerClient().listVolumesCmd()).thenThrow(new IllegalStateException("offline"));
-        assertFalse(manager(lifecycle, namespacedConfig()).removeLeftoverContainers("current"));
+        EcsContainerManager manager = manager(lifecycle, namespacedConfig());
+        assertTrue(manager.removeLeftoverContainers("current"));
+        assertFalse(manager.removeLeftoverTaskVolumes("current"));
         verify(lifecycle, never()).removeVolume(anyString());
     }
 

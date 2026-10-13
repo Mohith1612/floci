@@ -129,6 +129,7 @@ public class EcsService implements ContainerTeardown, ResourceProvider, Resettab
     private final Object reconcilerLock = new Object();
     // False until a previous run's task containers are confirmed gone; no task starts before.
     private volatile boolean leftoverContainersRemoved = true;
+    private volatile boolean leftoverTaskVolumesRemoved;
     private volatile boolean leftoverContainersBlockReported;
 
     // region::clusterName → EcsCluster
@@ -241,6 +242,7 @@ public class EcsService implements ContainerTeardown, ResourceProvider, Resettab
         this.containerManager = containerManager;
         this.dockerMode = !config.services().ecs().mock();
         this.sweepLeftoverContainers = dockerMode && config.services().ecs().reconcileContainersOnStartup();
+        this.leftoverTaskVolumesRemoved = !sweepLeftoverContainers;
         this.baseUrl = config.effectiveBaseUrl();
         this.lbRegistrar = lbRegistrar;
         this.storageFactory = storageFactory;
@@ -289,6 +291,7 @@ public class EcsService implements ContainerTeardown, ResourceProvider, Resettab
     void releasePreviousRunLeftovers() {
         if (sweepLeftoverContainers) {
             leftoverContainersRemoved = containerManager.removeLeftoverContainers();
+            retryPreviousRunTaskVolumes();
         }
         if (lbRegistrar != null) {
             lbRegistrar.releaseRecordedTargets();
@@ -4730,6 +4733,11 @@ public class EcsService implements ContainerTeardown, ResourceProvider, Resettab
 
     void reconcile() {
         try {
+            retryPreviousRunTaskVolumes();
+        } catch (Exception e) {
+            LOG.warnv(e, "ECS previous-run task volume cleanup failed: {0}", e.getMessage());
+        }
+        try {
             reconcileTasks();
         } catch (Exception e) {
             LOG.warnv(e, "ECS task reconciliation tick failed: {0}", e.getMessage());
@@ -4743,6 +4751,12 @@ public class EcsService implements ContainerTeardown, ResourceProvider, Resettab
                             accountId, e.getMessage());
                 }
             });
+        }
+    }
+
+    private void retryPreviousRunTaskVolumes() {
+        if (sweepLeftoverContainers && leftoverContainersRemoved && !leftoverTaskVolumesRemoved) {
+            leftoverTaskVolumesRemoved = containerManager.removeLeftoverTaskVolumes();
         }
     }
 

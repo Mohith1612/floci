@@ -873,7 +873,8 @@ Task teardown removes this storage after the containers have been removed. Clean
 when a task exits naturally or fails to launch. The task reconciler retries failed removals,
 including cleanup left pending by a failed launch or a state reset.
 With `reconcile-containers-on-startup` enabled, Floci also removes task volumes left by a previous
-run after their containers are gone. The sweep matches the emulator owner and run labels; it
+run after their containers are gone. Failed volume cleanup retries on reconciler ticks without
+blocking new task launches. The sweep matches the emulator owner and run labels; it
 leaves current-run volumes and other emulator instances alone. Unlike AWS's configurable delayed
 EC2 agent cleanup, Floci attempts removal during teardown. EFS-backed volumes remain shared and persistent, and the
 unsupported external volume configurations listed above remain unimplemented.

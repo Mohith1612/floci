@@ -1204,11 +1204,18 @@ public class EcsContainerManager {
         if (allRemoved) {
             leftoverRemovalFailuresReported.clear();
         }
-        return allRemoved && removeLeftoverTaskVolumes(currentRunId, owner, aliases);
+        return allRemoved;
     }
 
-    private boolean removeLeftoverTaskVolumes(String currentRunId, String owner,
-                                             ContainerStorageHelper.LabelAliases aliases) {
+    /** Removes previous-run task volumes independently of the container launch gate. */
+    public boolean removeLeftoverTaskVolumes() {
+        return removeLeftoverTaskVolumes(runId);
+    }
+
+    /** {@link #removeLeftoverTaskVolumes()} keeping volumes of {@code currentRunId}. */
+    public boolean removeLeftoverTaskVolumes(String currentRunId) {
+        String owner = ContainerStorageHelper.ownerIdentity(config);
+        ContainerStorageHelper.LabelAliases aliases = ContainerStorageHelper.CONTAINER_LABEL_ALIASES;
         try {
             List<InspectVolumeResponse> volumes = aliases.listByLabels(
                     Map.of(ContainerStorageHelper.SERVICE_LABEL, "ecs", ContainerStorageHelper.OWNER_LABEL, owner),
