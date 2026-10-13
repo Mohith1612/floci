@@ -147,6 +147,8 @@ public class EcsContainerManager {
     // A sweep failure is retried before each task launch; each distinct failure is a WARN once.
     private volatile boolean leftoverListFailureReported;
     private final Set<String> leftoverRemovalFailuresReported = ConcurrentHashMap.newKeySet();
+    private volatile boolean leftoverTaskVolumeListFailureReported;
+    private final Set<String> leftoverTaskVolumeRemovalFailuresReported = ConcurrentHashMap.newKeySet();
 
     @Inject
     public EcsContainerManager(ContainerBuilder containerBuilder,
@@ -1228,6 +1230,7 @@ public class EcsContainerManager {
                         }
                         return response.getVolumes();
                     }, InspectVolumeResponse::getName);
+            leftoverTaskVolumeListFailureReported = false;
             boolean allRemoved = true;
             for (InspectVolumeResponse volume : volumes) {
                 Map<String, String> labels = volume.getLabels();
@@ -1238,13 +1241,25 @@ public class EcsContainerManager {
                         || previousRun == null || currentRunId.equals(previousRun)) {
                     continue;
                 }
-                if (!lifecycleManager.removeVolume(volume.getName())) {
+                try {
+                    lifecycleManager.removeVolumeStrict(volume.getName());
+                    leftoverTaskVolumeRemovalFailuresReported.remove(volume.getName());
+                } catch (RuntimeException e) {
                     allRemoved = false;
+                    Logger.Level level = leftoverTaskVolumeRemovalFailuresReported.add(volume.getName())
+                            ? Logger.Level.WARN : Logger.Level.DEBUG;
+                    LOG.logv(level, "Could not remove ECS task volume {0} left by a previous run: {1}",
+                            volume.getName(), e.getMessage());
                 }
+            }
+            if (allRemoved) {
+                leftoverTaskVolumeRemovalFailuresReported.clear();
             }
             return allRemoved;
         } catch (RuntimeException e) {
-            LOG.warnv("Could not clean up ECS task volumes from a previous run: {0}", e.getMessage());
+            LOG.logv(leftoverTaskVolumeListFailureReported ? Logger.Level.DEBUG : Logger.Level.WARN,
+                    "Could not list ECS task volumes from a previous run: {0}", e.getMessage());
+            leftoverTaskVolumeListFailureReported = true;
             return false;
         }
     }
