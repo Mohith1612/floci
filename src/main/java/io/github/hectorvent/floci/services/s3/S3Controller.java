@@ -2299,16 +2299,32 @@ public class S3Controller {
     }
 
     private static Long multipartObjectSize(HttpHeaders httpHeaders, UriInfo uriInfo) {
-        String value = resolveHeaderOrQueryParam(httpHeaders, uriInfo, "x-amz-mp-object-size");
+        String name = "x-amz-mp-object-size";
+        String value = httpHeaders != null ? httpHeaders.getHeaderString(name) : null;
+        if (value == null && uriInfo != null && uriInfo.getQueryParameters() != null) {
+            for (Map.Entry<String, List<String>> entry : uriInfo.getQueryParameters().entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(name) && !entry.getValue().isEmpty()) {
+                    value = entry.getValue().getFirst();
+                    break;
+                }
+            }
+        }
         if (value == null) {
             return null;
         }
+        String normalized = value.trim();
+        long size;
         try {
-            return Long.valueOf(value.trim());
+            size = Long.parseLong(normalized);
         } catch (NumberFormatException e) {
-            throw new AwsException("InvalidArgument", "Invalid x-amz-mp-object-size header value", 400,
-                    Map.of("ArgumentName", "x-amz-mp-object-size", "ArgumentValue", value));
+            throw new AwsException("InvalidRequest", "Value for x-amz-mp-object-size header is invalid: '"
+                    + normalized + "'", 400);
         }
+        if (size < 0) {
+            throw new AwsException("InvalidRequest", "Value for x-amz-mp-object-size header is less than zero: '"
+                    + normalized + "'", 400);
+        }
+        return size;
     }
 
     private static String trailerHeader(HttpHeaders httpHeaders, UriInfo uriInfo) {

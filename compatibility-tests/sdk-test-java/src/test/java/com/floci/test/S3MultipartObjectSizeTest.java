@@ -18,8 +18,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class S3MultipartObjectSizeTest {
 
     @ParameterizedTest
-    @ValueSource(longs = {3, 5})
-    void objectSizeMismatchPreservesTheObjectAndUploadForRetry(long expectedSize) {
+    @ValueSource(longs = {-1, Long.MIN_VALUE, 3, 5})
+    void invalidObjectSizePreservesTheObjectAndUploadForRetry(long expectedSize) {
         String bucket = TestFixtures.uniqueName("sdk-multipart-size");
         String key = "object";
         try (S3Client s3 = TestFixtures.s3Client()) {
@@ -39,9 +39,11 @@ class S3MultipartObjectSizeTest {
                         .isInstanceOfSatisfying(S3Exception.class, error -> {
                             assertThat(error.statusCode()).isEqualTo(400);
                             assertThat(error.awsErrorDetails().errorCode()).isEqualTo("InvalidRequest");
-                            assertThat(error.awsErrorDetails().errorMessage()).isEqualTo(
-                                    "The provided 'x-amz-mp-object-size' header value " + expectedSize
-                                            + " does not match what was computed: 4");
+                            String expectedMessage = expectedSize < 0
+                                    ? "Value for x-amz-mp-object-size header is less than zero: '" + expectedSize + "'"
+                                    : "The provided 'x-amz-mp-object-size' header value " + expectedSize
+                                            + " does not match what was computed: 4";
+                            assertThat(error.awsErrorDetails().errorMessage()).isEqualTo(expectedMessage);
                         });
                 assertThat(s3.getObjectAsBytes(request -> request.bucket(bucket).key(key)).asUtf8String())
                         .isEqualTo("prior");
