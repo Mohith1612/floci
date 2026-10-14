@@ -1645,7 +1645,7 @@ public class S3Controller {
                 S3Checksum expectedChecksum = extractChecksum(httpHeaders, uriInfo);
                 S3Object obj = s3Service.completeMultipartUpload(bucket, key, uploadId, partNumbers,
                         completedPartETags(completedParts), completedPartChecksums(completedParts), checksumType,
-                        expectedChecksum);
+                        expectedChecksum, multipartObjectSize(httpHeaders, uriInfo));
                 String baseUrl = uriInfo.getBaseUri().toString();
                 if (baseUrl.endsWith("/")) {
                     baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
@@ -2295,6 +2295,19 @@ public class S3Controller {
         }
         if (size > maxSize) {
             throw S3Service.entityTooLarge(size, maxSize);
+        }
+    }
+
+    private static Long multipartObjectSize(HttpHeaders httpHeaders, UriInfo uriInfo) {
+        String value = resolveHeaderOrQueryParam(httpHeaders, uriInfo, "x-amz-mp-object-size");
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value.trim());
+        } catch (NumberFormatException e) {
+            throw new AwsException("InvalidArgument", "Invalid x-amz-mp-object-size header value", 400,
+                    Map.of("ArgumentName", "x-amz-mp-object-size", "ArgumentValue", value));
         }
     }
 
