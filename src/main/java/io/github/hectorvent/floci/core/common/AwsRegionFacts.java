@@ -17,7 +17,9 @@ import java.util.Set;
  * S3 website and GovCloud API Gateway hosted zone ids, the CloudFront hosted zone and distribution
  * domain suffix per partition, the SAML sign-on URL and the management console host per partition
  * and the VPC endpoint service-name prefixes. Every accessor is {@link Optional}: the ISO and EUSC partitions have no published
- * hosted zones, and a service that needs one there has nothing faithful to answer.
+ * hosted zones, and a service that needs one there has nothing faithful to answer. The one
+ * exception is {@link #rdsHostedZoneId}, which falls back to the us-east-1 zone from the AWS CLI
+ * RDS example while the other regions' zones are uncaptured.
  */
 public final class AwsRegionFacts {
 
@@ -29,6 +31,14 @@ public final class AwsRegionFacts {
     }
 
     private AwsRegionFacts() {
+    }
+
+    /** Returns the regional RDS hosted zone, or the documented fallback. */
+    public static String rdsHostedZoneId(String region) {
+        // Floci Route 53 resolves aliases by DNS name, so the us-east-1 zone stands in for uncaptured regions.
+        return regionText(region, "rdsHostedZoneId")
+                .or(() -> regionText("us-east-1", "rdsHostedZoneId")) // partition-literal: the only captured RDS zone
+                .orElseThrow();
     }
 
     /** Classic load balancers share the Application load balancer hosted zone. */

@@ -268,8 +268,10 @@ def test_build_merges_sources_with_terraform_winning_the_s3_conflicts(tmp_path):
     tf, cdk, guides, botocore = write_sources(tmp_path)
     document = r.build(tf, cdk, guides, botocore, PARTITIONS)
     regions = document["regions"]
+    assert document["_source"]["rds"] == "https://docs.aws.amazon.com/cli/v1/reference/rds/describe-db-instances.html"
     assert regions["us-east-1"] == {"albHostedZoneId": "Z35SXDOTRQ7X7K", "classicElbHostedZoneId": "Z35SXDOTRQ7X7K",
-                                    "nlbHostedZoneId": "Z26RNL4JYFTOTI", "s3WebsiteHostedZoneId": "Z3AQBSTGFYJSTF"}
+                                    "nlbHostedZoneId": "Z26RNL4JYFTOTI", "s3WebsiteHostedZoneId": "Z3AQBSTGFYJSTF",
+                                    "rdsHostedZoneId": "Z2R2ITUGPM61AM"}
     assert regions["af-south-1"]["s3WebsiteHostedZoneId"] == "Z83WF9RJE8B12"
     assert regions["us-isof-south-1"] == {"s3WebsiteHostedZoneId": "Z03376072I8GXC2DXUFXI",
                                           "vpcEndpointExceptionPrefix": "gov.ic.hci.csp",

@@ -12,6 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The vendored per-region tables, pinned against the Terraform and CDK rows they came from. */
 class AwsRegionFactsTest {
 
+    @Test
+    void rdsHostedZoneUsesDocumentedFallback() {
+        assertEquals("Z2R2ITUGPM61AM", AwsRegionFacts.rdsHostedZoneId("us-east-1"));
+        assertEquals("Z2R2ITUGPM61AM", AwsRegionFacts.rdsHostedZoneId("eu-west-1"));
+    }
+
     @ParameterizedTest
     @CsvSource({
             "us-east-1,      Z35SXDOTRQ7X7K,        Z26RNL4JYFTOTI,        Z3AQBSTGFYJSTF",

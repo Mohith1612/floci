@@ -45,7 +45,10 @@ China and GovCloud user guides for what neither transcribes, are the sources her
   resolved through the region descriptions in `partitions.json`. No source in `local/aws` gives
   the zone for any other region.
 
-Nothing is hand-typed. When the checkouts are absent (CI), `--check` only verifies the vendored
+- The us-east-1 RDS hosted zone id is from the AWS CLI describe-db-instances example
+  (`RDS_CLI_EXAMPLE_URL`); other regional values have not been captured.
+
+Except for the RDS example, facts are read from source files. When the checkouts are absent (CI), `--check` only verifies the vendored
 file parses and keeps its shape; a regeneration needs `local/aws`.
 
 Run from anywhere in the repo:
@@ -76,6 +79,8 @@ CDK_FACT_TABLES = "packages/aws-cdk-lib/region-info/build-tools/fact-tables.ts"
 CDK_CLOUDFRONT_TARGET = "packages/aws-cdk-lib/aws-route53-targets/lib/cloudfront-target.ts"
 CDK_VPC_ENDPOINT = "packages/aws-cdk-lib/aws-ec2/lib/vpc-endpoint.ts"
 BOTOCORE_CLOUDFRONT = "cloudfront/2020-05-31/service-2.json"
+RDS_CLI_EXAMPLE_URL = "https://docs.aws.amazon.com/cli/v1/reference/rds/describe-db-instances.html"
+RDS_US_EAST_1_HOSTED_ZONE_ID = "Z2R2ITUGPM61AM"
 
 GO_ROW_RE = re.compile(r'^\s*endpoints\.([A-Za-z0-9]+)RegionID:\s*"([A-Z0-9]+)",')
 TS_ROW_RE = re.compile(r"^\s*'([a-z0-9-]+)':\s*'([A-Z0-9]+)',")
@@ -330,6 +335,8 @@ def build(terraform: Path, cdk: Path, guides: Path, botocore_data: Path, partiti
             entry["vpcEndpointCnSuffixServices"] = vpce_cn_suffix[region]
         if region in apigateway_zones:
             entry["apiGatewayRegionalHostedZoneId"] = apigateway_zones[region]
+        if region == "us-east-1":
+            entry["rdsHostedZoneId"] = RDS_US_EAST_1_HOSTED_ZONE_ID
         regions[region] = entry
 
     partitions = {}
@@ -348,6 +355,7 @@ def build(terraform: Path, cdk: Path, guides: Path, botocore_data: Path, partiti
     return {
         "_source": {
             "generator": "tools/aws/regen_region_facts.py",
+            "rds": RDS_CLI_EXAMPLE_URL,
             "terraform": f"terraform-provider-aws {TF_ELB}, {TF_ELBV2}, {TF_S3}, {TF_CLIENT}",
             "cdk": f"aws-cdk {CDK_FACT_TABLES}, {CDK_CLOUDFRONT_TARGET}, {CDK_VPC_ENDPOINT}",
             "docs": "aws-docs/partition-guides (snapshots of the China and GovCloud user guides) " + ", ".join(GUIDE_PAGES),

@@ -7,6 +7,7 @@ import io.github.hectorvent.floci.core.common.AwsException;
 import io.github.hectorvent.floci.core.common.AwsNamespaces;
 import io.github.hectorvent.floci.core.common.AwsQueryLists;
 import io.github.hectorvent.floci.core.common.AwsQueryResponse;
+import io.github.hectorvent.floci.core.common.AwsRegionFacts;
 import io.github.hectorvent.floci.core.common.XmlBuilder;
 import io.github.hectorvent.floci.services.docdb.DocDbQueryHandler;
 import io.github.hectorvent.floci.services.neptune.NeptuneQueryHandler;
@@ -3007,6 +3008,8 @@ public class RdsQueryHandler {
             xml.start("Endpoint")
                .elem("Address", ep.address())
                .elem("Port", ep.port())
+               .elem("HostedZoneId", AwsRegionFacts.rdsHostedZoneId(
+                       AwsArnUtils.regionOrDefault(i.getDbInstanceArn(), config.defaultRegion())))
                .end("Endpoint");
         }
         RdsService.InstanceCertificate ca = service.instanceCertificate(i);
@@ -3243,6 +3246,8 @@ public class RdsQueryHandler {
             xml.elem("Endpoint", ep.address())
                .elem("Port", ep.port());
         }
+        xml.elem("HostedZoneId", AwsRegionFacts.rdsHostedZoneId(
+                AwsArnUtils.regionOrDefault(c.getDbClusterArn(), config.defaultRegion())));
         if (readerEp != null) {
             xml.elem("ReaderEndpoint", readerEp.address());
         }
