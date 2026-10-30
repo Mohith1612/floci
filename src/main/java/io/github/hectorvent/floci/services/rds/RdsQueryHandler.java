@@ -67,6 +67,9 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class RdsQueryHandler {
 
+    // Route 53 resolves aliases by DNS name; use the captured us-east-1 zone when no regional fact exists.
+    private static final String UNSOURCED_RDS_HOSTED_ZONE_ID = "Z2R2ITUGPM61AM"; // partition-literal: RDS fallback for uncaptured regions
+
     private static final Logger LOG = Logger.getLogger(RdsQueryHandler.class);
 
     private final RdsService service;
@@ -3009,7 +3012,8 @@ public class RdsQueryHandler {
                .elem("Address", ep.address())
                .elem("Port", ep.port())
                .elem("HostedZoneId", AwsRegionFacts.rdsHostedZoneId(
-                       AwsArnUtils.regionOrDefault(i.getDbInstanceArn(), config.defaultRegion())))
+                       AwsArnUtils.regionOrDefault(i.getDbInstanceArn(), config.defaultRegion()))
+                       .orElse(UNSOURCED_RDS_HOSTED_ZONE_ID))
                .end("Endpoint");
         }
         RdsService.InstanceCertificate ca = service.instanceCertificate(i);
@@ -3247,7 +3251,8 @@ public class RdsQueryHandler {
                .elem("Port", ep.port());
         }
         xml.elem("HostedZoneId", AwsRegionFacts.rdsHostedZoneId(
-                AwsArnUtils.regionOrDefault(c.getDbClusterArn(), config.defaultRegion())));
+                AwsArnUtils.regionOrDefault(c.getDbClusterArn(), config.defaultRegion()))
+                .orElse(UNSOURCED_RDS_HOSTED_ZONE_ID));
         if (readerEp != null) {
             xml.elem("ReaderEndpoint", readerEp.address());
         }

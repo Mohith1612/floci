@@ -13,9 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AwsRegionFactsTest {
 
     @Test
-    void rdsHostedZoneUsesDocumentedFallback() {
-        assertEquals("Z2R2ITUGPM61AM", AwsRegionFacts.rdsHostedZoneId("us-east-1"));
-        assertEquals("Z2R2ITUGPM61AM", AwsRegionFacts.rdsHostedZoneId("eu-west-1"));
+    void rdsHostedZoneIsPresentOnlyForCapturedRegions() {
+        assertEquals(Optional.of("Z2R2ITUGPM61AM"), AwsRegionFacts.rdsHostedZoneId("us-east-1"));
+        assertTrue(AwsRegionFacts.rdsHostedZoneId("eu-west-1").isEmpty());
     }
 
     @ParameterizedTest
